@@ -44,18 +44,12 @@ end
 --------------Getters--------------------
 
 --------------Cell Fns-------------------
-for i = 1, boxEdge do
-    cells[i] = {}
-    for j = 1,boxEdge do
-        cells[i][j] = 0
-    end
-end
+cells = {}
 
 function clearCells()
     for i = 1, boxEdge do
         for j = 1, boxEdge do
-            cells[i][j] = 0
-            print("hit")
+            cells[j*boxEdge+i] = 0
         end
     end
 
@@ -65,21 +59,21 @@ function LoadCells()
     clearCells()
     if(isPulseDead() == 0) then
         pos = GetPulsePos()
-        cells[toCellX(pulsePos[0])][toCellY(pulsePos[1])] = 3
+        index = toCellX(pulsePos[0])+toCellY(pulsePos[1])*boxEdge
+        cells[index] = 3
     end
     x = toCellX(GetPlayerX())
     y = toCellY(GetPlayerY())
-    print(tostring(y))
-    cells[x][y] = 1
+    cells[y*boxEdge+x] = 1
     
 end
 
 function toCellX(pos)
-    return pos*boxEdge/nesWidth
+    return math.floor(pos*boxEdge/nesWidth)
 end
 
 function toCellY(pos)
-    return pos*boxEdge/nesHeight
+    return math.floor(pos*boxEdge/nesHeight)
 end
 
 
@@ -87,7 +81,7 @@ function WillDrawShit()
      gui.drawRectangle(0,0,100,100,0x33FFFFFF,0x33FFFFFF)
      for i = 1, boxEdge do
         for j = 1, boxEdge do 
-            if(cells[i][j]== 3) then
+            if(cells[j*boxEdge + i]== 3) then
                 gui.drawBox(i,j,i+1,j+1,red,red)
             end
         end
@@ -97,7 +91,7 @@ function WillDrawShit()
      x = toCellX(GetPlayerX())
      y = toCellY(GetPlayerY())
      
-     gui.drawBox(x,y,x+1,y+1,red,blue)
+     gui.drawBox(x,y,x+1,y+1,blue,blue)
 end
 --------------Cell Fns-------------------
 
