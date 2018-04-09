@@ -2,7 +2,7 @@ pulseX = 0 --Memory Location 0x0713
 pulseY = 0 --Memory Location 0x070C
 pulseTrig = 0 --Memory Location 0x0712
 playerX = 0 --Memory Location 0x070F
-
+playerY = 0 --Memory location 0x07
 ButtonNames = {
     'A',
     'B',
@@ -43,9 +43,8 @@ function getPulsePos()
     pulsePos[0] = pulseX
     pulsePos[1] = pulseY
 end
-function getPlayerX()
-    playerX = mainmemory.readbyte(0x070F)
-    return playerX
+function getPlayerX() 
+    return mainmemory.readbyte(0x070F)
 end
 
 function getPlayerY()
