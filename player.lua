@@ -53,7 +53,7 @@ function GetPlayerX()
 end
 
 function GetPlayerY()
-    playerX = mainmemory.readbyte(0x070F)
+    playeY = mainmemory.readbyte(0x070F)
     return math.floor(mainmemory.readbyte(0x070C))
 end
 --------------Getters--------------------
