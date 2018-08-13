@@ -1,19 +1,3 @@
----[[NEAT ALGORITHM CODE IS WRITTEN BY SethBling ]]---
-----Debbugga----
-test = forms.newform(500,500,"Debugga")
-white = 0x00000000
-frame = 1
-offsetX = 30
-offsetY = 30
-varName = {}
-varVal = {}
-pbox = forms.pictureBox(test,0,0,400,400)
-red = 0xFFFF0000
-green = 0xFF00FF00
-blue = 0xFF0000FF
-varName = {}
-varVal = {}
-
 ButtonNames = {
     "A",
     "Right",
@@ -25,9 +9,16 @@ nesWidth = 255
 pulsePos = {}
 enemyPulse = {}
 enemyPulsePos = {}
-Inputs = 10101
 Outputs = #ButtonNames
+Inputs = 10101
 
+white = 0xFFFFFFFF
+red = 0xFFFF0000
+green = 0xFF00FF00
+blue = 0xFF0000FF
+yellow = 0xFFFFFF00
+
+time=0
 Population = 300
 DeltaDisjoint = 2.0
 DeltaWeights = 0.4
@@ -71,10 +62,10 @@ function clearDebugger()
 	varName = {}
 	varVal = {}
 end
-----/Debbugga----
-
+SaveName = "SI.State"
 ButtonNames = {
       "A",
+	  "Left",
       "Right",
 }
 boxEdge = 100
@@ -84,9 +75,33 @@ pulsePos = {}
 enemyPulse = {}
 enemyPulsePos = {}
 Outputs = #ButtonNames
-
+EnemyArray = {}
+separation = 4
+initdist = 2004
 
 -------------Getters--------------------
+function clearEnemyArray()
+	for i=0, 19 do
+		EnemyArray[i] = {}
+		for j=0, 22 do
+			EnemyArray[i][j] = 0
+		end
+	end
+end
+clearEnemyArray()
+function UpdateEnemyArray()
+	clearEnemyArray()
+	baserotation = mainmemory.readbyte(0x00B9)+1
+	basevalue = (math.floor((baserotation+(math.floor(baserotation)/12)%2)/4)%3)*((-1)^(math.floor((baserotation)/12))) + 2*((math.floor((baserotation)/12))%2)
+	for i=0, 19 do
+		EnemyArray[i] = {}
+		for j=0, 22 do
+			EnemyArray[i][j] = mainmemory.readbyte(0x0242 + i*32 + j)
+		end
+	end
+end
+
+
 function checkEnemyPulse()
     enemyPulse[0] = mainmemory.readbyte(0x0716)
     enemyPulse[1] = mainmemory.readbyte(0x071A)
@@ -100,8 +115,8 @@ function getEnemyPulsePos(i)
     pos[1] = mainmemory.readbyte(0x0714 + i*4)
     return pos
 end
-function getLives()
-	return mainmemory.readbyte(0x029)
+function isPlayerAlive()
+	return mainmemory.readbyte(0x22D)
 end
 function checkPulse()
    pulseTrig = mainmemory.readbyte(0x0712);
@@ -141,6 +156,16 @@ end
 function LoadCells()
     cells = {}
     clearCells()
+	UpdateEnemyArray();
+	for i=0, 19 do
+		for j=basevalue, 19+basevalue do
+			if(EnemyArray[i][j] ~= 0) then
+				index = initdist + i*boxEdge*separation + j*separation + (GetSpriteState(EnemyArray[i][j]))*(-1)^(math.floor(baserotation/12)) + 3*((math.floor(baserotation/12))%2)
+				cells[index] = 2
+			end
+		end
+	end
+
     if(checkPulse() == 0) then
         pos = getPulsePos()
         index = toCellX(pulsePos[0])+toCellY(pulsePos[1])*boxEdge
@@ -159,6 +184,9 @@ function LoadCells()
     cells[y*boxEdge+x] = 1
 end
 
+function GetSpriteState(val)
+	return val-((math.floor(val/16))*16)
+end
 function toCellX(pos)
     return math.floor(pos*boxEdge/nesWidth)
 end
@@ -168,26 +196,26 @@ function toCellY(pos)
 end
 
 
+function drawContainer(offset,containersize,col)
+	gui.drawRectangle(offset,offset,containersize,containersize,col,col)
+end
+
 function DrawBox()
-     gui.drawRectangle(0,0,100,100,0x33FFFFFF,0x33FFFFFF)
-     local val = 0
-     for i = 1, boxEdge do
-        for j = 1, boxEdge do 
-            val = cells[j*boxEdge + i]
-            if(val == 3) then
-                gui.drawBox(i,j,i+1,j+1,red,blue)
-            end
-            if(val == 4) then
-                gui.drawBox(i,j,i+1,j+1,green,blue)
+	drawContainer(1,boxEdge,0x33FFFFFF)
+    for i = 1, boxEdge do
+        for j = 1, boxEdge do
+			if(cells[j*boxEdge + i]== 2) then --for enemy
+                gui.drawBox(i,j,i+1,j+1,yellow,yellow)
+			end
+            if(cells[j*boxEdge + i]== 3) then
+                gui.drawBox(i,j,i+1,j+1,white,white)
+			end
+            if(cells[j*boxEdge + i]== 4) then
+                gui.drawBox(i,j,i+1,j+1,green,green)
             end
         end
     end
-
-
-     x = toCellX(getPlayerX())
-     y = toCellY(getPlayerY())
-     
-     gui.drawBox(x,y,x+1,y+1,blue,red)
+    gui.drawBox(x,y,x+1,y+1,blue,blue)
 end
 function getScore()
 	return mainmemory.readbyte(0x0022)
@@ -209,6 +237,14 @@ function executeInputs()
 end
 
 -------------NEAT Algorithm Code-----------
+function getInputs()
+	LoadCells()
+	local inputs = {}
+    inputs  = cells	
+	return inputs
+end
+
+
 function sigmoid(x)
 	return 2/(1+math.exp(-4.9*x))-1
 end
@@ -368,6 +404,9 @@ function evaluateNetwork(network, inputs)
 		for j = 1,#neuron.incoming do
 			local incoming = neuron.incoming[j]
 			local other = network.neurons[incoming.into]
+			if other.value == nil then
+				other.value = 0
+			end
 			sum = sum + incoming.weight * other.value
 		end
 		
@@ -387,6 +426,41 @@ function evaluateNetwork(network, inputs)
 	end
 	
 	return outputs
+end
+
+function crossover(g1, g2)
+        -- Make sure g1 is the higher fitness genome
+        if g2.fitness > g1.fitness then
+                tempg = g1
+                g1 = g2
+                g2 = tempg
+        end
+ 
+        local child = newGenome()
+       
+        local innovations2 = {}
+        for i=1,#g2.genes do
+                local gene = g2.genes[i]
+                innovations2[gene.innovation] = gene
+        end
+       
+        for i=1,#g1.genes do
+                local gene1 = g1.genes[i]
+                local gene2 = innovations2[gene1.innovation]
+                if gene2 ~= nil and math.random(2) == 1 and gene2.enabled then
+                        table.insert(child.genes, copyGene(gene2))
+                else
+                        table.insert(child.genes, copyGene(gene1))
+                end
+        end
+       
+        child.maxneuron = math.max(g1.maxneuron,g2.maxneuron)
+       
+        for mutation,rate in pairs(g1.mutationRates) do
+                child.mutationRates[mutation] = rate
+        end
+       
+        return child
 end
 
 function randomNeuron(genes, nonInput)
@@ -772,30 +846,6 @@ function addToSpecies(child)
 	end
 end
 -------------------------/Ranking and Weeding------------------------
-function getInputs()
-	LoadCells()
-	local inputs = {}
-    inputs  = cells	
-	return inputs
-end
-function nextGenome()
-	pool.currentGenome = pool.currentGenome + 1
-	if pool.currentGenome > #pool.species[pool.currentSpecies].genomes then
-		pool.currentGenome = 1
-		pool.currentSpecies = pool.currentSpecies+1
-		if pool.currentSpecies > #pool.species then
-			newGeneration()
-			pool.currentSpecies = 1
-		end
-	end
-end
-
-function fitnessAlreadyMeasured()
-	local species = pool.species[pool.currentSpecies]
-	local genome = species.genomes[pool.currentGenome]
-	
-	return genome.fitness ~= 0
-end
 function newGeneration()
 	cullSpecies(false) -- Cull the bottom half of each species
 	rankGlobally()
@@ -827,7 +877,6 @@ function newGeneration()
 	
 	pool.generation = pool.generation + 1
 	
-	writeFile("backup." .. pool.generation .. "." .. forms.gettext(saveLoadFile))
 end
 	
 function initializePool()
@@ -841,7 +890,6 @@ function initializePool()
 	initializeRun()
 end
 
-	
 function clearJoypad()
 	controller = {}
 	for b = 1,#ButtonNames do
@@ -851,8 +899,9 @@ function clearJoypad()
 end
 
 function initializeRun()
-    time = 0
-    previousX = getPlayerX
+    savestate.load(SaveName)
+	time = 0;
+    previousX = getPlayerX()
 	pool.currentFrame = 0
 	timeout = TimeoutConstant
 	clearJoypad()
@@ -862,7 +911,6 @@ function initializeRun()
 	generateNetwork(genome)
 	evaluateCurrent()
 end
-hasPressedA = false
 function evaluateCurrent()
 	local species = pool.species[pool.currentSpecies]
 	local genome = species.genomes[pool.currentGenome]
@@ -884,14 +932,29 @@ function evaluateCurrent()
 end
 
 if pool == nil then
-	initializePool()
+        initializePool()
 end
 
+function nextGenome()
+	pool.currentGenome = pool.currentGenome + 1
+	if pool.currentGenome > #pool.species[pool.currentSpecies].genomes then
+		pool.currentGenome = 1
+		pool.currentSpecies = pool.currentSpecies+1
+		if pool.currentSpecies > #pool.species then
+			newGeneration()
+			pool.currentSpecies = 1
+		end
+	end
+end
 
+function fitnessAlreadyMeasured()
+	local species = pool.species[pool.currentSpecies]
+	local genome = species.genomes[pool.currentGenome]
+	return genome.fitness ~= 0
+end
 
 while true do
   	local species = pool.species[pool.currentSpecies]
-    
     local genome = species.genomes[pool.currentGenome]
     
     if pool.currentFrame%5 == 0 then
@@ -899,35 +962,30 @@ while true do
 	end
     
   	joypad.set(controller)
-
-  	getPlayerX()
-	if playerX ~= previousX then
-		timeout = TimeoutConstant
-	end
-    
-    timeout = timeout - 1
 	
 	local timeoutBonus = pool.currentFrame / 4
-    
-    if timeout + timeoutBonus <= 0 then
-        local fitness = time - pool.currentFrame / 2
-		if fitness <= 0 then
-			fitness = -1
-		end
-		genome.fitness = fitness
-        
+	timeout = timeout - 1
+	local timeoutBonus = pool.currentFrame / 4
+	--fitness = time - (pool.currentFrame) / 2 - (timeout + timeoutBonus)*2/3
+	fitness = getScore()*100
+	alive = isPlayerAlive()
+	if alive == false then
+		time = 0
+        console.writeline("Fitness on death: ".. fitness)
+		timeout = TimeoutConstant
+		fitness = fitness - 800
 		if fitness > pool.maxFitness then
-			pool.maxFitness = fitness
+			pool.maxFitness = fitness 
 		end
-		pool.currentSpecies = 1
-        pool.currentGenome = 1
-        
-        while fitnessAlreadyMeasured() do
-            nextGenome()
+		while alive ==  false do
+			alive = isPlayerAlive() 
+			emu.frameadvance() 
 		end
+		nextGenome()
 		initializeRun()
 	end
-
+   
+    
 	local measured = 0
     local total = 0
     
@@ -940,9 +998,9 @@ while true do
 		end
 	end
     
-    if(pool.currentFrame % 150 == 0) then
+    if(pool.currentFrame % 50 == 0) then
 		console.writeline("Gen " .. pool.generation .. " species " .. pool.currentSpecies .. " genome " .. pool.currentGenome .. " (" .. math.floor(measured/total*100) .. "%)")
-		console.writeline("Fitness: " .. math.floor(time - (pool.currentFrame) / 2 - (timeout + timeoutBonus)*2/3))
+		console.writeline("Fitness: " ..fitness)
         console.writeline("Max Fitness: " .. math.floor(pool.maxFitness))
     end
     
@@ -953,7 +1011,7 @@ while true do
     
     pool.currentFrame = pool.currentFrame + 1
 
-    DrawBox()
+    --DrawBox()
     
     emu.frameadvance()
 
